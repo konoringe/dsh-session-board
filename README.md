@@ -106,7 +106,9 @@ tests/                # vitest 单测：分组语义 / 可见性 / store 持久�
 - **点击会话**：优先走 `uiWorkspace.openSession`（与内置一致的导航 + 关面板），
   缺席时回退 `sessions.open` + `layout.selectPanel(null)`。
 - **样式**：手写作用域类名（`dsb-*` 前缀）一次性注入 `<style data-plugin-css>`，
-  对齐内置插件做法；颜色取概念稿配色，中性色用半透明叠加以适配浅色主题。
+  对齐内置插件做法；中性色用半透明叠加适配明暗主题；菜单/弹层/Toast 的底色与文字
+  绑定 dsh 主题令牌（`--dsw-specific-menu` / `--dsw-alias-label-primary`，含后备链），
+  深浅皮肤（含以高优先级选择器统一改写文字颜色的皮肤）下都保持可读。
 
 ## 开发
 

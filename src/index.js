@@ -14,7 +14,7 @@
  * lifecycle runs through ctx.effect alone.
  */
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.2.1';
 
 /** Cordis fiber dependencies: none — the layer is intentionally standalone. */
 export const inject = [];
