@@ -18,38 +18,57 @@
 
 ## 安装
 
-### 开发安装（本地目录）
+以 GitHub 安装为基准。profile 名按环境选择：**桌面客户端用 `desktop`，纯 Web UI（`dsh web`）用 `web`**，自定义 profile 换成对应名字即可。
+
+### 方式一：自己安装
+
+1. 执行安装：
+
+   ```bash
+   dsh plugin --profile desktop add --prod github:konoringe/dsh-session-board
+   ```
+
+2. pnpm 若询问是否允许运行构建脚本（allowBuilds），放行 `dsh-session-board`；
+   仓库已附带构建好的 `lib/client.js`，构建被跳过时也能直接使用。
+3. 重启 Web 服务（桌面客户端：重启客户端或设置里的重启入口）并刷新页面。
+
+卸载：`dsh plugin --profile desktop remove dsh-session-board`——layer 出栈即完全
+逆注册，无残留（客户端注册随 bundle 卸载自动回收）。
+
+### 方式二：让 AI 助手代装
+
+把下面这段话发给正在目标 dsh 实例中工作的 AI 助手即可：
+
+> 请帮我安装 dsh-session-board 插件：
+> 1. 执行 `dsh plugin --profile desktop add --prod github:konoringe/dsh-session-board`；
+>    若 pnpm 询问构建脚本放行，允许 dsh-session-board。
+> 2. 完成后提醒我重启 Web 服务并刷新页面。
+> 3. 验收：左栏变为「工作区 → 计划中/未完成/已完成/已归档」树形看板；
+>    右键文件夹可重命名；底部无状态页脚。
+>
+> 纯 Web UI（`dsh web`）环境请把 profile 名换成 `web`。
+
+### 本地开发安装（仅改代码的开发者）
 
 ```bash
+git clone https://github.com/konoringe/dsh-session-board
 dsh plugin --profile desktop add --prod link:<克隆目录的绝对路径>
 ```
 
-> 实测环境为 EAC 桌面端，profile 名为 `desktop`；其他环境按 `dsh` 提示选择 profile。
-> `link:` 安装是符号链接：改源码后**重启 Web 服务即生效**，无需重新 add；
-> `--prod` 跳过 vitest 等开发依赖，profile 安装保持最小。
+`link:` 安装是符号链接：改源码后重启 Web 服务即生效，无需重新 add；
+`--prod` 跳过 vitest 等开发依赖，profile 安装保持最小。
 
-### 发布安装（GitHub）
+### 安装机制说明
 
-```bash
-dsh plugin --profile web add github:<owner>/dsh-session-board
-```
+`dsh plugin add` 会在 profile 目录内执行 `pnpm add`，随后按包内
+`package.json → dsh.bundle` 声明把插件挂入 layer 栈（见 `cordis.patch.yml`）。
 
-说明：
-
-- `dsh plugin add` 会在 profile 目录内执行 `pnpm add`，随后按包内
-  `package.json → dsh.bundle` 声明把插件挂入 layer 栈（见 `cordis.patch.yml`）。
-- git 来源安装会触发 `prepare` 脚本构建 `lib/client.js`；pnpm 若询问是否允许
-  运行构建脚本（allowBuilds），按提示放行 `dsh-session-board` 即可。
-  仓库内已附带构建好的 `lib/client.js`，构建被跳过时也能直接使用。
-- 卸载：`dsh plugin --profile web remove dsh-session-board`——layer 出栈即完全
-  逆注册，无残留（客户端注册随 bundle 卸载自动回收）。
-
-## 数据与持久化（v0.1）
+## 数据与持久化
 
 | 数据 | 位置 | 说明 |
 |---|---|---|
 | 会话状态 + 备注 | 浏览器 localStorage：`dsh.session-board.meta.v1` | 按 webview origin（= dsh profile）隔离；schema 带 `version` 字段，损坏自动回退 |
-| 文件夹/工作区展开状态 | localStorage：`dsh.session-board.view.v1` | 仅记录显式覆盖；默认「计划中/未完成」展开、当前会话所属工作区展开 |
+| 展开/折叠状态 + 文件夹自定义名 | localStorage：`dsh.session-board.view.v1` | 展开仅记录显式覆盖；默认「计划中/未完成」展开、当前会话所属工作区展开、空文件夹折叠；名称留空即恢复默认 |
 
 会话与工作区本身完全沿用 dsh 官方数据（`sessions` / `workspaces` 服务），
 **不复制、不缓存会话内容**；分组依据 = `workspace.sessionIds`（与内置浏览器一致），
@@ -95,7 +114,6 @@ tests/                # vitest 单测：分组语义 / 可见性 / store 持久�
 pnpm install        # 安装 vitest
 pnpm build          # 重新生成 lib/client.js（也可 node scripts/build-client.mjs）
 pnpm test           # vitest 单测
-dsh plugin --profile web add link:<本仓库绝对路径>   # 挂到独立 profile 验证
 ```
 
 bundle 无需打包器：构建脚本只做「剥 import/export → 拼接 → 包
