@@ -1,3 +1,7 @@
 node_modules/
 *.log
 .DS_Store
+
+# stray SSH keypair accidentally created in the repo — never commit
+E：
+E：.pub

@@ -221,3 +221,25 @@ describe('view state defaults', () => {
     })).toBe(false);
   });
 });
+describe('empty folder default collapse', () => {
+  const view = { workspaces: {}, folders: {} };
+
+  it('collapses folders without sessions regardless of the default-open pair', () => {
+    expect(isFolderOpen(view, 'ws1', 'planned', false)).toBe(false);
+    expect(isFolderOpen(view, 'ws1', 'in_progress', false)).toBe(false);
+    expect(isFolderOpen(view, 'ws1', 'done', false)).toBe(false);
+    expect(isFolderOpen(view, 'ws1', 'archived', false)).toBe(false);
+  });
+
+  it('keeps non-empty defaults (计划中/未完成 open, done/archived closed)', () => {
+    expect(isFolderOpen(view, 'ws1', 'planned', true)).toBe(true);
+    expect(isFolderOpen(view, 'ws1', 'in_progress', true)).toBe(true);
+    expect(isFolderOpen(view, 'ws1', 'done', true)).toBe(false);
+    expect(isFolderOpen(view, 'ws1', 'archived', true)).toBe(false);
+  });
+
+  it('an explicit user toggle beats the empty rule', () => {
+    expect(isFolderOpen({ workspaces: {}, folders: { 'ws1|done': true } }, 'ws1', 'done', false)).toBe(true);
+    expect(isFolderOpen({ workspaces: {}, folders: { 'ws1|planned': false } }, 'ws1', 'planned', true)).toBe(false);
+  });
+});

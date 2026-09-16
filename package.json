@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-board",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Session board for dsh: sidebar tree of workspace → status folders (planned / in-progress / done / archived) with count badges, right-click categorization, drag & drop, and per-session notes.",
   "type": "module",
   "main": "./src/index.js",

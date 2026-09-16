@@ -59,7 +59,12 @@ const zh = {
   'toast.note': '备注已保存',
   'toast.crossWorkspace': '会话归属其工作目录，不能跨项目移动',
   'takeover.failed': 'sidebar.workspaces 接管未生效，本次会话沿用内置会话列表。',
-  'foot.enabled': `session-board v${VERSION} · 已启用`,
+  'menu.rename': '📝 重命名',
+  'menu.resetName': '↺ 恢复默认名称',
+  'modal.rename.title': '自定义文件夹名称',
+  'modal.rename.placeholder': '输入新名称，留空恢复默认',
+  'toast.nameSaved': '名称已更新',
+  'toast.nameReset': '已恢复默认名称',
 };
 
 const en = {
@@ -86,7 +91,12 @@ const en = {
   'toast.note': 'Note saved',
   'toast.crossWorkspace': 'Sessions belong to their workspace and cannot move across projects',
   'takeover.failed': 'sidebar.workspaces takeover did not take effect; keeping the built-in list for this page.',
-  'foot.enabled': `session-board v${VERSION} · enabled`,
+  'menu.rename': '📝 Rename',
+  'menu.resetName': '↺ Reset to default name',
+  'modal.rename.title': 'Customize folder name',
+  'modal.rename.placeholder': 'New name; leave empty to restore the default',
+  'toast.nameSaved': 'Name updated',
+  'toast.nameReset': 'Default name restored',
 };
 
 /* ------------------------------------------------------------------ */
@@ -131,9 +141,6 @@ const STYLE = `
 .dsb-pill{font-size:9.5px;opacity:.7;border:1px dashed rgba(127,127,127,.8);border-radius:4px;padding:0 4px;flex:none}
 .dsb-empty{margin-left:10px;padding:7px 8px;font-size:11px;opacity:.45;text-align:center;cursor:default;
   border:1px dashed rgba(127,127,127,.35);border-radius:7px}
-.dsb-foot{flex:none;display:flex;align-items:center;gap:7px;padding:8px 14px;font-size:11px;opacity:.6;
-  border-top:1px solid rgba(127,127,127,.15)}
-.dsb-dot-live{width:7px;height:7px;border-radius:50%;background:var(--dsb-done);box-shadow:0 0 6px var(--dsb-done);flex:none}
 .dsb-hint{margin:14px 12px;padding:12px;font-size:12px;opacity:.5;text-align:center;
   border:1px dashed rgba(127,127,127,.3);border-radius:8px}
 .dsb-ctx-backdrop{position:absolute;inset:0;z-index:25;background:transparent}
@@ -152,10 +159,11 @@ const STYLE = `
 .dsb-modal{width:300px;max-width:calc(100% - 24px);padding:14px;border-radius:12px;
   background:#1a2130;color:#d9dfe8;border:1px solid rgba(127,127,127,.25);box-shadow:0 12px 32px rgba(0,0,0,.45)}
 .dsb-modal h3{margin:0 0 10px;font-size:13.5px;font-weight:600}
-.dsb-modal textarea{display:block;width:100%;box-sizing:border-box;min-height:84px;padding:8px 10px;
+.dsb-modal textarea,.dsb-modal input{display:block;width:100%;box-sizing:border-box;padding:8px 10px;
   background:rgba(127,127,127,.12);border:1px solid rgba(127,127,127,.25);border-radius:8px;
-  color:#d9dfe8;font-size:12.5px;font-family:inherit;resize:vertical;outline:none}
-.dsb-modal textarea:focus{border-color:var(--dsb-accent)}
+  color:#d9dfe8;font-size:12.5px;font-family:inherit;outline:none}
+.dsb-modal textarea{min-height:84px;resize:vertical}
+.dsb-modal textarea:focus,.dsb-modal input:focus{border-color:var(--dsb-accent)}
 .dsb-modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .dsb-modal-btns button{background:rgba(127,127,127,.15);border:1px solid rgba(127,127,127,.25);
   color:inherit;border-radius:8px;padding:6px 14px;font-size:12.5px;cursor:pointer}
@@ -223,10 +231,11 @@ function FolderSection({ group, status, rows, open, view, io }) {
         className: 'dsb-row dsb-folder-row' + (open ? ' fopen' : '') + (io.dropKey === dropKey ? ' drop' : ''),
         'data-status': status,
         onClick: () => io.viewApi.toggleFolder(group.key, status),
+        onContextMenu: (event) => io.onFolderContextMenu(event, status),
         ...dropProps,
       },
       h(FolderDot, { status }),
-      h('span', { className: 'dsb-f-label' }, io.t('status.' + status)),
+      h('span', { className: 'dsb-f-label' }, io.folderLabel(status)),
       h('span', { className: 'dsb-count' }, String(rows.length)),
     ),
     open
@@ -282,7 +291,7 @@ function WorkspaceGroup({ group, open, currentGroupKey, firstGroupKey, view, io,
             group,
             status,
             rows: buckets[status],
-            open: isFolderOpen(view, group.key, status),
+            open: isFolderOpen(view, group.key, status, group.buckets[status].length > 0),
             view,
             io,
           }),
@@ -324,7 +333,7 @@ function ContextMenu({ menu, row, io }) {
             onClick: () => io.categorize(row.id, status),
           },
           h(FolderDot, { status }),
-          io.t('status.' + status),
+          io.folderLabel(status),
           row.status === status ? h('span', { className: 'dsb-ctx-check' }, '✓') : null,
         ),
       ),
@@ -389,6 +398,85 @@ function NoteModal({ target, io }) {
   );
 }
 
+/** Right-click menu for a folder row: rename (and reset when customized). */
+function FolderMenu({ menu, io }) {
+  return h('div', {
+    className: 'dsb-ctx-backdrop',
+    tabIndex: -1,
+    autoFocus: true,
+    onClick: io.closeMenu,
+    onContextMenu: (event) => {
+      event.preventDefault();
+      io.closeMenu();
+    },
+    onKeyDown: (event) => {
+      if (event.key === 'Escape') io.closeMenu();
+    },
+    children: h(
+      'div',
+      {
+        className: 'dsb-ctx',
+        role: 'menu',
+        style: { left: menu.x, top: menu.y },
+        onClick: (event) => event.stopPropagation(),
+      },
+      h('div', { className: 'dsb-ctx-title' }, io.folderLabel(menu.status)),
+      h('div', {
+        role: 'menuitem',
+        className: 'dsb-ctx-item',
+        onClick: () => io.openRename(menu.status),
+      }, io.t('menu.rename')),
+      io.names && io.names[menu.status]
+        ? h('div', {
+            role: 'menuitem',
+            className: 'dsb-ctx-item',
+            onClick: () => io.resetName(menu.status),
+          }, io.t('menu.resetName'))
+        : null,
+    ),
+  });
+}
+
+/** Single-line rename dialog: Enter saves, Escape closes, empty restores default. */
+function RenameModal({ status, names, io }) {
+  const inputRef = React.useRef(null);
+  const initial = names && typeof names[status] === 'string' ? names[status] : '';
+  const save = () => io.saveName(status, inputRef.current ? inputRef.current.value : '');
+  return h(
+    'div',
+    {
+      className: 'dsb-overlay',
+      onClick: (event) => {
+        if (event.target === event.currentTarget) io.closeRename();
+      },
+      onKeyDown: (event) => {
+        if (event.key === 'Escape') io.closeRename();
+      },
+    },
+    h(
+      'div',
+      { className: 'dsb-modal', role: 'dialog', 'aria-label': io.t('modal.rename.title') },
+      h('h3', null, io.t('modal.rename.title')),
+      h('input', {
+        ref: inputRef,
+        autoFocus: true,
+        defaultValue: initial,
+        placeholder: io.t('modal.rename.placeholder'),
+        maxLength: 24,
+        onKeyDown: (event) => {
+          if (event.key === 'Enter') save();
+        },
+      }),
+      h(
+        'div',
+        { className: 'dsb-modal-btns' },
+        h('button', { type: 'button', onClick: io.closeRename }, io.t('modal.cancel')),
+        h('button', { type: 'button', className: 'primary', onClick: save }, io.t('modal.save')),
+      ),
+    ),
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* The board                                                           */
 /* ------------------------------------------------------------------ */
@@ -413,8 +501,9 @@ export function SessionBoard(props) {
   const toastTimerRef = React.useRef(undefined);
 
   const [query, setQuery] = React.useState('');
-  const [menu, setMenu] = React.useState(undefined); // { sessionId, x, y }
+  const [menu, setMenu] = React.useState(undefined); // {kind:'session', sessionId, x, y} | {kind:'folder', status, x, y}
   const [noteTarget, setNoteTarget] = React.useState(undefined); // sessionId
+  const [renameTarget, setRenameTarget] = React.useState(undefined); // status
   const [toast, setToast] = React.useState(undefined); // { id, msg }
   const [dropKey, setDropKey] = React.useState(undefined);
 
@@ -448,17 +537,42 @@ export function SessionBoard(props) {
     toastTimerRef.current = window.setTimeout(() => setToast(undefined), 2200);
   }, []);
 
+  /** Folder display name: user customization first, i18n default second. */
+  const folderLabel = (status) => {
+    const custom = view.names && typeof view.names[status] === 'string' && view.names[status] !== '' ? view.names[status] : undefined;
+    return custom ?? t('status.' + status);
+  };
+
   const io = {
     t,
     current: sessions.current,
     metaMap,
     viewApi,
+    names: view.names,
+    folderLabel,
     dropKey,
     dropOwner: dragIdRef.current === null ? null : ownerBySession.get(dragIdRef.current) ?? null,
     openSession,
-    onContextMenu: (event, sessionId) => openMenu(event, sessionId),
+    onContextMenu: (event, sessionId) => openMenu(event, 'session', sessionId),
+    onFolderContextMenu: (event, status) => openMenu(event, 'folder', status),
     closeMenu: () => setMenu(undefined),
     closeNote: () => setNoteTarget(undefined),
+    closeRename: () => setRenameTarget(undefined),
+    openRename: (status) => {
+      setMenu(undefined);
+      setRenameTarget(status);
+    },
+    resetName: (status) => {
+      setMenu(undefined);
+      viewApi.setFolderName(status, '');
+      showToast(t('toast.nameReset'));
+    },
+    saveName: (status, value) => {
+      viewApi.setFolderName(status, value);
+      setRenameTarget(undefined);
+      const trimmed = typeof value === 'string' ? value.trim() : '';
+      showToast(trimmed === '' ? t('toast.nameReset') : t('toast.nameSaved'));
+    },
     categorize: (sessionId, status) => {
       setMenu(undefined);
       const row = rowById.get(sessionId);
@@ -515,12 +629,12 @@ export function SessionBoard(props) {
     },
   };
 
-  const openMenu = (event, sessionId) => {
+  const openMenu = (event, kind, payload) => {
     event.preventDefault();
     const rootRect = rootRef.current ? rootRef.current.getBoundingClientRect() : { left: 0, top: 0, width: 300, height: 600 };
     const x = Math.min(event.clientX - rootRect.left, Math.max(8, rootRect.width - MENU_W - 8));
     const y = Math.min(event.clientY - rootRect.top, Math.max(8, rootRect.height - MENU_H - 8));
-    setMenu({ sessionId, x, y });
+    setMenu(kind === 'folder' ? { kind, status: payload, x, y } : { kind, sessionId: payload, x, y });
   };
 
   const currentGroupKey = sessions.current !== undefined ? ownerBySession.get(sessions.current) : undefined;
@@ -568,8 +682,7 @@ export function SessionBoard(props) {
             }),
           ),
     ),
-    h('div', { className: 'dsb-foot' }, h('span', { className: 'dsb-dot-live', 'aria-hidden': 'true' }), t('foot.enabled')),
-    menu && rowById.get(menu.sessionId)
+    menu && menu.kind === 'session' && rowById.get(menu.sessionId)
       ? h(ContextMenu, {
           key: menu.sessionId + ':' + menu.x + ':' + menu.y,
           menu,
@@ -577,8 +690,18 @@ export function SessionBoard(props) {
           io,
         })
       : null,
+    menu && menu.kind === 'folder'
+      ? h(FolderMenu, {
+          key: 'folder:' + menu.status + ':' + menu.x + ':' + menu.y,
+          menu,
+          io,
+        })
+      : null,
     noteTarget
       ? h(NoteModal, { target: noteTarget, io })
+      : null,
+    renameTarget
+      ? h(RenameModal, { status: renameTarget, names: view.names, io })
       : null,
     toast ? h('div', { key: toast.id, className: 'dsb-toast', role: 'status' }, toast.msg) : null,
   );
@@ -646,6 +769,7 @@ export function apply(ctx) {
     viewApi: {
       toggleWorkspace: (groupKey) => view.toggleWorkspace(groupKey),
       toggleFolder: (groupKey, status) => view.toggleFolder(groupKey, status),
+      setFolderName: (status, name) => view.setFolderName(status, name),
     },
     hooks: {
       sessions: sessions.list,

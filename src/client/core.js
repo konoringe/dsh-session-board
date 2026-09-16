@@ -194,9 +194,20 @@ function sanitizeView(raw) {
     }
     return out;
   };
+  const pickNames = (value) => {
+    if (value === null || typeof value !== 'object') return {};
+    const out = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (!VALID_STATUSES.has(key) || typeof entry !== 'string') continue;
+      const trimmed = entry.trim().slice(0, 24);
+      if (trimmed !== '') out[key] = trimmed;
+    }
+    return out;
+  };
   return {
     workspaces: pick(raw?.workspaces),
     folders: pick(raw?.folders),
+    names: pickNames(raw?.names),
   };
 }
 
@@ -225,6 +236,7 @@ export function createBoardViewStore(options = {}) {
     store.set({
       workspaces: mapKey === 'workspaces' ? { ...current.workspaces, [key]: !(current.workspaces[key] ?? false) } : current.workspaces,
       folders: mapKey === 'folders' ? { ...current.folders, [key]: !(current.folders[key] ?? false) } : current.folders,
+      names: current.names,
     });
   };
   return {
@@ -232,6 +244,20 @@ export function createBoardViewStore(options = {}) {
     subscribe: store.subscribe,
     toggleWorkspace: (workspaceId) => flip('workspaces', workspaceId),
     toggleFolder: (workspaceId, status) => flip('folders', `${workspaceId}|${status}`),
+    /**
+     * Customize one folder's display name (all four folders). Empty or
+     * whitespace-only input removes the customization, restoring the i18n
+     * default. Names are capped at 24 characters after trimming.
+     */
+    setFolderName: (status, name) => {
+      if (!VALID_STATUSES.has(status)) throw new Error(`session-board: unknown status "${status}"`);
+      const current = store.getSnapshot();
+      const trimmed = typeof name === 'string' ? name.trim().slice(0, 24) : '';
+      const names = { ...current.names };
+      if (trimmed === '') delete names[status];
+      else names[status] = trimmed;
+      store.set({ workspaces: current.workspaces, folders: current.folders, names });
+    },
   };
 }
 
@@ -243,10 +269,14 @@ export function isWorkspaceOpen(view, groupKey, { currentGroupKey, firstGroupKey
   return groupKey === firstGroupKey;
 }
 
-/** Effective open state for a folder row (计划中/未完成 default open). */
-export function isFolderOpen(view, workspaceId, status) {
+/**
+ * Effective open state for a folder row (计划中/未完成 default open). Folders
+ * without sessions default to collapsed; an explicit user toggle always wins.
+ */
+export function isFolderOpen(view, workspaceId, status, hasSessions = true) {
   const explicit = view.folders[`${workspaceId}|${status}`];
   if (explicit !== undefined) return explicit;
+  if (hasSessions === false) return false;
   return status === 'planned' || status === 'in_progress';
 }
 

@@ -105,6 +105,57 @@ describe('view store', () => {
     const storage = makeStorage();
     storage.setItem('dsh.session-board.view.v1', ']not json[');
     const store = createBoardViewStore({ storage });
-    expect(store.getSnapshot()).toEqual({ workspaces: {}, folders: {} });
+    expect(store.getSnapshot()).toEqual({ workspaces: {}, folders: {}, names: {} });
+  });
+});
+describe('folder name customization', () => {
+  it('sets, trims, and persists custom names; toggle preserves them', async () => {
+    const storage = makeStorage();
+    const store = createBoardViewStore({ storage });
+    store.setFolderName('planned', '  backlog  ');
+    store.toggleWorkspace('ws1');
+    await flush();
+    const snapshot = store.getSnapshot();
+    expect(snapshot.names.planned).toBe('backlog');
+    expect(snapshot.workspaces.ws1).toBe(true);
+    const second = createBoardViewStore({ storage });
+    expect(second.getSnapshot().names.planned).toBe('backlog');
+  });
+
+  it('caps names at 24 characters', () => {
+    const store = createBoardViewStore({ storage: makeStorage() });
+    store.setFolderName('done', 'x'.repeat(40));
+    expect(store.getSnapshot().names.done).toBe('x'.repeat(24));
+  });
+
+  it('clearing a name removes it, restoring the default', async () => {
+    const storage = makeStorage();
+    const store = createBoardViewStore({ storage });
+    store.setFolderName('done', 'shipped');
+    store.setFolderName('done', '   ');
+    expect(store.getSnapshot().names.done).toBeUndefined();
+    await flush();
+    const parsed = JSON.parse(storage.getItem('dsh.session-board.view.v1'));
+    expect(parsed.names.done).toBeUndefined();
+    expect(parsed.names).toEqual({});
+  });
+
+  it('rejects unknown statuses', () => {
+    const store = createBoardViewStore({ storage: makeStorage() });
+    expect(() => store.setFolderName('someday', 'x')).toThrow();
+  });
+
+  it('sanitizes persisted names (valid key set, strings, 24-char cap)', () => {
+    const storage = makeStorage();
+    storage.setItem(
+      'dsh.session-board.view.v1',
+      JSON.stringify({ workspaces: {}, folders: {}, names: { planned: '  ok  ', done: 42, in_progress: '   ', archived: 'y'.repeat(30), bogus: 'z' } }),
+    );
+    const names = createBoardViewStore({ storage }).getSnapshot().names;
+    expect(names.planned).toBe('ok');
+    expect(names.done).toBeUndefined();
+    expect(names.in_progress).toBeUndefined();
+    expect(names.archived).toBe('y'.repeat(24));
+    expect(names.bogus).toBeUndefined();
   });
 });
