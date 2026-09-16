@@ -1,0 +1,10 @@
+# dsh-session-board bundle patch.
+#
+# The web half of this plugin (lib/client.js) is activated by the dsh.client
+# declaration in package.json — it needs no node-side wiring to render the
+# sidebar board. This patch inserts the small host-side diagnostics service
+# (src/index.js) so the layer shows up in the Cordis tree and can be observed
+# / extended later (e.g. a future host-backed state.json store).
+- insert:
+    - id: session-board
+      name: dsh-session-board

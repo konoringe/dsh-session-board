@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>dsh session-board 插件 · 概念预览</title>
+<style>
+  :root{
+    --dsh-bg:#0b0e14; --dsh-panel:#10141b; --dsh-panel2:#161c26;
+    --dsh-border:#232b38; --dsh-text:#d9dfe8; --dsh-dim:#8a94a3;
+    --dsh-accent:#4d6bfe;
+    --dsh-planned:#5aa2ff; --dsh-progress:#e0a437; --dsh-done:#46c26e; --dsh-archived:#7e8aa0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{height:100%}
+  body{font-family:system-ui,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--dsh-bg);color:var(--dsh-text);overflow:hidden}
+  .banner{padding:7px 14px;font-size:12px;color:#aab8ff;border-bottom:1px solid var(--dsh-border);
+    background:linear-gradient(90deg,rgba(77,107,254,.22),rgba(77,107,254,.06))}
+  .banner b{color:#cdd9ff}
+  .app{display:flex;height:calc(100vh - 33px)}
+
+  /* ---------- 侧栏 ---------- */
+  .sidebar{width:300px;min-width:260px;background:var(--dsh-panel);border-right:1px solid var(--dsh-border);display:flex;flex-direction:column}
+  .side-head{padding:12px 12px 8px;border-bottom:1px solid var(--dsh-border)}
+  .logo{font-size:14px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .logo .profile{font-size:11px;font-weight:400;color:var(--dsh-dim);border:1px solid var(--dsh-border);border-radius:20px;padding:1px 8px}
+  .search{width:100%;background:var(--dsh-panel2);border:1px solid var(--dsh-border);border-radius:8px;
+    padding:6px 10px;color:var(--dsh-text);font-size:12px;outline:none}
+  .search:focus{border-color:var(--dsh-accent)}
+  .tree{flex:1;overflow-y:auto;padding:8px 6px}
+  .tree::-webkit-scrollbar{width:8px}
+  .tree::-webkit-scrollbar-thumb{background:#232b38;border-radius:4px}
+
+  .row{display:flex;align-items:center;gap:7px;border-radius:7px;padding:6px 8px;cursor:pointer;user-select:none;font-size:12.5px}
+  .row:hover{background:var(--dsh-panel2)}
+  .chev{font-size:10px;color:var(--dsh-dim);transition:transform .15s;width:10px;text-align:center}
+  .ws.open>.ws-row .chev{transform:rotate(90deg)}
+  .ws-ic{font-size:13px}
+  .ws-name{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ws-count{font-size:10.5px;color:var(--dsh-dim);background:var(--dsh-panel2);border-radius:10px;padding:1px 7px}
+  .folders{margin:2px 0 6px}
+  .folder-row{margin-left:14px}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .f-label{flex:1}
+  .count{font-size:10.5px;color:var(--dsh-dim);background:var(--dsh-panel2);border-radius:10px;padding:1px 7px}
+  .folder-row.fopen{background:rgba(255,255,255,.03)}
+  .folder-row.drop{outline:1.5px dashed var(--dsh-accent);outline-offset:-2px;background:rgba(77,107,254,.12)}
+  .ses{margin-left:26px;display:flex;flex-direction:column;gap:1px}
+  .ses-row{padding:5px 8px 5px 10px;color:var(--dsh-dim)}
+  .ses-row:hover{color:var(--dsh-text)}
+  .ses-row.selected{background:rgba(77,107,254,.15);color:#fff}
+  .ses-row.uncat{opacity:.5}
+  .ses-ic{font-size:11px;opacity:.8}
+  .ses-row .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .n-ic{font-size:10px;opacity:.9}
+  .pill{font-size:9.5px;color:var(--dsh-dim);border:1px dashed var(--dsh-dim);border-radius:4px;padding:0 4px;flex:none}
+  .empty{margin-left:10px;padding:7px 8px;font-size:11px;color:#5b6572;border:1px dashed var(--dsh-border);border-radius:7px;text-align:center}
+  .empty.drop{outline:1.5px dashed var(--dsh-accent);color:var(--dsh-accent)}
+  .side-foot{padding:9px 14px;border-top:1px solid var(--dsh-border);font-size:11px;color:var(--dsh-dim);display:flex;align-items:center;gap:7px}
+  .dot-live{width:7px;height:7px;border-radius:50%;background:var(--dsh-done);box-shadow:0 0 6px var(--dsh-done)}
+
+  /* ---------- 主区 ---------- */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .main-head{padding:14px 20px;border-bottom:1px solid var(--dsh-border);display:flex;flex-direction:column;gap:6px}
+  .main-head h2{font-size:15px;font-weight:600}
+  .head-sub{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--dsh-dim)}
+  .pill-st{font-size:11px;border-radius:20px;padding:2px 9px;display:inline-flex;align-items:center;gap:5px}
+  .main-body{flex:1;display:flex;min-height:0}
+  .chat{flex:1;display:flex;flex-direction:column;gap:12px;padding:20px;overflow-y:auto}
+  .msg{max-width:72%;border-radius:12px;padding:10px 13px;font-size:13px;line-height:1.65;width:fit-content}
+  .msg.user{background:rgba(77,107,254,.16);border:1px solid rgba(77,107,254,.35);align-self:flex-end}
+  .msg.ai{background:var(--dsh-panel2);border:1px solid var(--dsh-border);align-self:flex-start}
+  .tool{align-self:flex-start;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--dsh-dim);
+    border:1px solid var(--dsh-border);border-radius:8px;padding:6px 10px;background:#0d1117}
+
+  /* ---------- 右键菜单 ---------- */
+  .ctx{position:fixed;z-index:100;min-width:198px;background:#151b25;border:1px solid var(--dsh-border);
+    border-radius:10px;padding:5px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+  .ctx-title{font-size:11px;color:var(--dsh-dim);padding:5px 9px 6px;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid var(--dsh-border);margin-bottom:4px}
+  .ctx-sec{font-size:10px;color:#5b6572;letter-spacing:1px;padding:4px 9px 2px}
+  .ctx-item{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:6px 9px;border-radius:6px;cursor:pointer}
+  .ctx-item:hover{background:rgba(255,255,255,.07)}
+  .ctx-item.on{color:var(--dsh-accent)}
+  .ctx-sep{height:1px;background:var(--dsh-border);margin:4px 6px}
+
+  /* ---------- 弹层 / 提示 ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200}
+  .modal{width:340px;background:#151b25;border:1px solid var(--dsh-border);border-radius:12px;padding:16px}
+  .modal h3{font-size:14px;margin-bottom:10px}
+  .modal textarea{width:100%;background:var(--dsh-panel2);border:1px solid var(--dsh-border);border-radius:8px;
+    color:var(--dsh-text);font-size:12.5px;padding:8px 10px;resize:vertical;outline:none;font-family:inherit}
+  .modal textarea:focus{border-color:var(--dsh-accent)}
+  .modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+  .modal-btns button{background:var(--dsh-panel2);border:1px solid var(--dsh-border);color:var(--dsh-text);
+    border-radius:8px;padding:6px 14px;font-size:12.5px;cursor:pointer}
+  .modal-btns button.primary{background:var(--dsh-accent);border-color:var(--dsh-accent);color:#fff}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:#1b2230;border:1px solid var(--dsh-border);
+    border-radius:20px;padding:8px 18px;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:300}
+</style>
+</head>
+<body>
+  <div class="banner">🎛 <b>概念预览（非真实 dsh 界面）</b> — session-board 插件：左栏改造为「工作区 → 四状态文件夹 → 会话」。试试：<b>右键会话</b>归类/写备注，或直接<b>拖拽会话进文件夹</b>。</div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="side-head">
+        <div class="logo">dsh <span class="profile">web profile</span></div>
+        <input class="search" placeholder="搜索会话…"/>
+      </div>
+      <div class="tree" id="tree"></div>
+      <div class="side-foot"><span class="dot-live"></span>session-board v0.1 · 已启用</div>
+    </aside>
+
+    <main class="main">
+      <header class="main-head" id="mainHead"></header>
+      <div class="main-body">
+        <div class="chat" id="chat"></div>
+      </div>
+    </main>
+  </div>
+
+  <div class="ctx" id="ctx" hidden></div>
+
+  <div class="overlay" id="overlay" hidden>
+    <div class="modal">
+      <h3 id="noteTitle">编辑备注</h3>
+      <textarea id="noteText" rows="4" placeholder="例如：等待用户确认方案后再继续…"></textarea>
+      <div class="modal-btns">
+        <button id="noteCancel">取消</button>
+        <button id="noteSave" class="primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+const ORDER = ['planned','progress','done','archived']; // 展示顺序：流水线 → 归档
+const ST = {
+  planned : {label:'计划中', c:'var(--dsh-planned)',  hex:'#5aa2ff'},
+  progress: {label:'未完成', c:'var(--dsh-progress)', hex:'#e0a437'},
+  done    : {label:'已完成', c:'var(--dsh-done)',     hex:'#46c26e'},
+  archived: {label:'已归档', c:'var(--dsh-archived)', hex:'#7e8aa0'},
+};
+
+const ws = [
+  {id:'ws1', name:'dsh-session-board', cwd:'E:\\projects\\dsh-session-board', open:true},
+  {id:'ws2', name:'company-website',   cwd:'E:\\projects\\company-website',   open:false},
+];
+
+// st=null 表示从未归类（显示在「计划中」，带“待归类”标记）
+const sessions = {
+  s1:{ws:'ws1',title:'编写 zh / en locale 字典', st:'planned', note:'',                up:'昨天'},
+  s2:{ws:'ws1',title:'调研侧栏 slot 挂载点',     st:'planned', note:'重点看 Sidebar.tsx 的注册 id', up:'2 小时前'},
+  s3:{ws:'ws1',title:'设计 state.json 原子写入', st:null,      note:'',                up:'3 天前'},
+  s4:{ws:'ws1',title:'树形会话栏渲染组件',       st:'progress',note:'等待 slot 注入方案确认', up:'1 小时前'},
+  s5:{ws:'ws1',title:'右键归类菜单与备注编辑',   st:'progress',note:'',                up:'30 分钟前'},
+  s6:{ws:'ws1',title:'pnpm + tsdown 脚手架',     st:'done',    note:'',                up:'昨天'},
+  s7:{ws:'ws1',title:'hello-world 插件加载验证', st:'done',    note:'',                up:'昨天'},
+  s8:{ws:'ws1',title:'数据模型与状态字段定义',   st:'done',    note:'',                up:'2 天前'},
+  s9:{ws:'ws1',title:'旧版四列看板原型',         st:'archived',note:'方案已废弃，保留参考', up:'上周'},
+  s10:{ws:'ws1',title:'早期需求整理',            st:'archived',note:'',                up:'上周'},
+  s11:{ws:'ws2',title:'首页 Hero 区改版',        st:'progress',note:'',                up:'3 天前'},
+  s12:{ws:'ws2',title:'SEO 元信息修复',          st:'done',    note:'',                up:'上周'},
+  s13:{ws:'ws2',title:'多语言路由方案',          st:'planned', note:'',                up:'3 天前'},
+};
+
+const chatScripts = {
+  s4:[
+    {r:'user', t:'把左侧会话栏改造成「工作区 → 状态文件夹 → 会话」的树形结构，先出组件骨架。'},
+    {r:'tool', t:'read  packages/client/src/sidebar/Sidebar.tsx'},
+    {r:'ai',   t:'好的。分组数据由 useSessions / useWorkspaces 派生，展开状态放入 createSidebarStore()；未归类会话先落在「计划中」并显示待归类标记，归类动作通过 sessionProjects 服务写回 state.json。'},
+  ],
+};
+const genericChat = [
+  {r:'user', t:'继续推进这个会话。'},
+  {r:'ai',   t:'当前进度已同步。可以从左侧栏右键菜单把这个会话归到合适的状态。'},
+];
+
+let selected='s4', ctxId=null, dragId=null, noteTarget=null;
+const openFolders = new Set(['ws1|planned','ws1|progress']);
+
+/* ---------- 渲染：侧栏树 ---------- */
+function renderTree(){
+  let h='';
+  for(const w of ws){
+    const list = Object.entries(sessions).filter(([,s])=>s.ws===w.id);
+    h+=`<div class="ws ${w.open?'open':''}">`;
+    h+=`<div class="row ws-row" data-ws="${w.id}"><span class="chev">▶</span><span class="ws-ic">🗂</span><span class="ws-name">${esc(w.name)}</span><span class="ws-count">${list.length}</span></div>`;
+    if(w.open){
+      for(const k of ORDER){
+        const st=ST[k];
+        const ids = list.filter(([,s])=> s.st===k || (k==='planned' && !s.st)).map(([id])=>id);
+        const isOpen = openFolders.has(w.id+'|'+k);
+        h+=`<div class="folders">`;
+        h+=`<div class="row folder-row ${isOpen?'fopen':''}" data-ws="${w.id}" data-st="${k}">
+              <span class="dot" style="background:${st.c}"></span><span class="f-label">${st.label}</span><span class="count">${ids.length}</span>
+            </div>`;
+        if(isOpen){
+          h+=`<div class="ses" data-ws="${w.id}" data-st="${k}">`;
+          if(!ids.length) h+=`<div class="empty">暂无会话 · 可拖入</div>`;
+          for(const id of ids){
+            const s=sessions[id];
+            h+=`<div class="row ses-row ${s.st?'':'uncat'} ${selected===id?'selected':''}" draggable="true" data-id="${id}">
+                  <span class="ses-ic">💬</span><span class="t">${esc(s.title)}</span>
+                  ${s.note?'<span class="n-ic" title="'+esc(s.note)+'">📝</span>':''}
+                  ${s.st?'':'<span class="pill">待归类</span>'}
+                </div>`;
+          }
+          h+=`</div>`;
+        }
+        h+=`</div>`;
+      }
+    }
+    h+=`</div>`;
+  }
+  $('#tree').innerHTML=h;
+}
+
+/* ---------- 渲染：主区 ---------- */
+function pill(k){
+  const st=ST[k];
+  return `<span class="pill-st" style="color:${st.hex};background:${st.hex}1f;border:1px solid ${st.hex}55">● ${st.label}</span>`;
+}
+function renderMain(){
+  const s=sessions[selected];
+  $('#mainHead').innerHTML=`<h2>${esc(s.title)}</h2>
+    <div class="head-sub">${s.st?pill(s.st):pill('planned')}<span>🗂 ${esc(ws.find(w=>w.id===s.ws).name)}</span><span>·</span><span>更新于 ${esc(s.up)}</span></div>`;
+  const script = chatScripts[selected] || genericChat;
+  $('#chat').innerHTML = script.map(m =>
+    m.r==='tool' ? `<div class="tool">⚙ ${esc(m.t)}</div>`
+                 : `<div class="msg ${m.r}">${esc(m.t)}</div>`).join('');
+}
+
+/* ---------- 归类 / 备注 / 提示 ---------- */
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.hidden=false;
+  clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true, 2200);
+}
+function categorize(id, st){
+  const s=sessions[id]; const changed = s.st!==st;
+  s.st=st; s.up='刚刚';
+  renderTree(); renderMain();
+  if(changed) toast(`已将「${s.title}」归类到 ${ST[st].label}`);
+}
+function openNote(id){
+  noteTarget=id;
+  $('#noteText').value = sessions[id].note || '';
+  $('#overlay').hidden=false;
+  $('#noteText').focus();
+}
+
+/* ---------- 侧栏事件 ---------- */
+$('#tree').addEventListener('click', e=>{
+  const wsRow = e.target.closest('.ws-row');
+  if(wsRow){ const w=ws.find(x=>x.id===wsRow.dataset.ws); w.open=!w.open; renderTree(); return; }
+  const fRow = e.target.closest('.folder-row');
+  if(fRow){ const key=fRow.dataset.ws+'|'+fRow.dataset.st;
+    openFolders.has(key)?openFolders.delete(key):openFolders.add(key); renderTree(); return; }
+  const sRow = e.target.closest('.ses-row');
+  if(sRow){ selected=sRow.dataset.id; renderTree(); renderMain(); }
+});
+
+$('#tree').addEventListener('contextmenu', e=>{
+  const sRow=e.target.closest('.ses-row');
+  if(!sRow) return;
+  e.preventDefault();
+  ctxId=sRow.dataset.id;
+  const s=sessions[ctxId];
+  const ctx=$('#ctx');
+  ctx.innerHTML=`
+    <div class="ctx-title">${esc(s.title)}</div>
+    <div class="ctx-sec">归类到</div>
+    ${ORDER.map(k=>`<div class="ctx-item ${s.st===k?'on':''}" data-act="move" data-k="${k}">
+        <span class="dot" style="background:${ST[k].c}"></span>${ST[k].label}${s.st===k?' <span style="margin-left:auto">✓</span>':''}</div>`).join('')}
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" data-act="note">📝 编辑备注</div>
+    <div class="ctx-item" data-act="open">↗ 在主区打开</div>`;
+  ctx.hidden=false;
+  const r=ctx.getBoundingClientRect();
+  ctx.style.left=Math.min(e.clientX, innerWidth-r.width-8)+'px';
+  ctx.style.top =Math.min(e.clientY, innerHeight-r.height-8)+'px';
+});
+
+$('#ctx').addEventListener('click', e=>{
+  const item=e.target.closest('.ctx-item');
+  if(!item) return;
+  $('#ctx').hidden=true;
+  if(item.dataset.act==='move') categorize(ctxId, item.dataset.k);
+  if(item.dataset.act==='note') openNote(ctxId);
+  if(item.dataset.act==='open'){ selected=ctxId; renderTree(); renderMain(); }
+});
+document.addEventListener('click', e=>{ if(!e.target.closest('#ctx')) $('#ctx').hidden=true; });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ $('#ctx').hidden=true; $('#overlay').hidden=true; } });
+
+/* ---------- 拖拽归类 ---------- */
+$('#tree').addEventListener('dragstart', e=>{
+  const sRow=e.target.closest('.ses-row');
+  if(!sRow) return;
+  dragId=sRow.dataset.id;
+  e.dataTransfer.setData('text/plain', dragId);
+  e.dataTransfer.effectAllowed='move';
+});
+function dropTarget(e){
+  const fRow=e.target.closest('.folder-row');
+  if(fRow) return fRow;
+  const zone=e.target.closest('.ses');
+  if(zone) return zone.previousElementSibling && zone.previousElementSibling.classList.contains('folder-row')
+    ? zone.previousElementSibling : null;
+  return null;
+}
+$('#tree').addEventListener('dragover', e=>{
+  const t=dropTarget(e);
+  if(!t || !dragId) return;
+  if(t.dataset.ws!==sessions[dragId].ws) return; // 会话归属其工作目录
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.drop').forEach(x=>x.classList.remove('drop'));
+  t.classList.add('drop');
+});
+$('#tree').addEventListener('dragleave', e=>{
+  const t=dropTarget(e); if(t) t.classList.remove('drop');
+});
+$('#tree').addEventListener('drop', e=>{
+  const t=dropTarget(e);
+  document.querySelectorAll('.drop').forEach(x=>x.classList.remove('drop'));
+  if(!t || !dragId) return;
+  e.preventDefault();
+  if(t.dataset.ws!==sessions[dragId].ws){ toast('会话归属其工作目录，不能跨项目移动'); return; }
+  categorize(dragId, t.dataset.st);
+  dragId=null;
+});
+
+/* ---------- 备注弹层 ---------- */
+$('#noteCancel').onclick=()=>{ $('#overlay').hidden=true; };
+$('#noteSave').onclick=()=>{
+  const s=sessions[noteTarget];
+  s.note=$('#noteText').value.trim(); s.up='刚刚';
+  $('#overlay').hidden=true;
+  renderTree(); renderMain();
+  toast('备注已保存');
+};
+$('#overlay').addEventListener('click', e=>{ if(e.target===$('#overlay')) $('#overlay').hidden=true; });
+
+renderTree();
+renderMain();
+</script>
+</body>
+</html>
